@@ -5,7 +5,7 @@ import { db, DATA_DIR, schema } from "@/lib/db/client";
 import { ensureBaseGlossary } from "@/lib/glossary/base";
 import { extractGlossaryCandidates } from "@/lib/glossary/extract";
 import { detectExt, parseDocument, type SupportedExt } from "@/lib/parsers";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 export type IncomingFile = {
   filename: string;
@@ -16,7 +16,8 @@ export type IncomingFile = {
 export async function createLotFromUpload(params: {
   name: string;
   files: IncomingFile[];
-}): Promise<{ lotId: string; docsIngested: number; candidates: number }> {
+  sourceLotId?: string;
+}): Promise<{ lotId: string; docsIngested: number; candidates: number; clonedTerms: number }> {
   ensureBaseGlossary();
 
   const lotId = crypto.randomUUID();
@@ -30,6 +31,8 @@ export async function createLotFromUpload(params: {
       status: "draft",
     })
     .run();
+
+  const clonedTerms = params.sourceLotId ? cloneValidatedTerms(params.sourceLotId, lotId) : 0;
 
   const allSegments: string[] = [];
   let docsIngested = 0;
@@ -76,13 +79,22 @@ export async function createLotFromUpload(params: {
     }
   }
 
-  // Extraction candidats glossaire via Claude
-  const baseGlossaryFr = db
+  // Extraction candidats glossaire via Claude — on ignore aussi les termes clonés depuis le lot source
+  const alreadyCoveredFr = db
     .select({ termFr: schema.glossaryTerms.termFr })
     .from(schema.glossaryTerms)
-    .where(eq(schema.glossaryTerms.source, "base"))
+    .where(
+      eq(schema.glossaryTerms.source, "base"),
+    )
     .all()
     .map((r) => r.termFr);
+  const clonedFr = db
+    .select({ termFr: schema.glossaryTerms.termFr })
+    .from(schema.glossaryTerms)
+    .where(eq(schema.glossaryTerms.lotId, lotId))
+    .all()
+    .map((r) => r.termFr);
+  const baseGlossaryFr = [...alreadyCoveredFr, ...clonedFr];
 
   let candidatesCount = 0;
   if (allSegments.length > 0) {
@@ -116,7 +128,47 @@ export async function createLotFromUpload(params: {
     .where(eq(schema.lots.id, lotId))
     .run();
 
-  return { lotId, docsIngested, candidates: candidatesCount };
+  return { lotId, docsIngested, candidates: candidatesCount, clonedTerms };
+}
+
+/**
+ * Clone les termes validés (extracted+user validated=true) du lot source
+ * comme termes source='user' du nouveau lot. Ignore le glossaire de base (déjà global).
+ */
+function cloneValidatedTerms(sourceLotId: string, newLotId: string): number {
+  const rows = db
+    .select({
+      termFr: schema.glossaryTerms.termFr,
+      termZh: schema.glossaryTerms.termZh,
+      notes: schema.glossaryTerms.notes,
+    })
+    .from(schema.glossaryTerms)
+    .where(
+      and(
+        eq(schema.glossaryTerms.lotId, sourceLotId),
+        eq(schema.glossaryTerms.validated, true),
+        inArray(schema.glossaryTerms.source, ["extracted", "user"]),
+      ),
+    )
+    .all();
+
+  if (rows.length === 0) return 0;
+
+  db.insert(schema.glossaryTerms)
+    .values(
+      rows.map((r) => ({
+        id: crypto.randomUUID(),
+        termFr: r.termFr,
+        termZh: r.termZh,
+        source: "user" as const,
+        validated: true,
+        notes: r.notes ? `cloné : ${r.notes}` : "cloné d'un lot passé",
+        lotId: newLotId,
+      })),
+    )
+    .run();
+
+  return rows.length;
 }
 
 function persistSegments(

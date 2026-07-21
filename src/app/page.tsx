@@ -1,6 +1,15 @@
+import { desc } from "drizzle-orm";
+import { db, schema } from "@/lib/db/client";
 import { uploadLotAction } from "./actions";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const pastLots = db
+    .select({ id: schema.lots.id, name: schema.lots.name, createdAt: schema.lots.createdAt })
+    .from(schema.lots)
+    .orderBy(desc(schema.lots.createdAt))
+    .limit(20)
+    .all();
+
   return (
     <div className="space-y-8">
       <section>
@@ -24,6 +33,28 @@ export default function HomePage() {
             placeholder="Ex : Appel d'offres CPS Casablanca — Écran salle plénière"
             className="w-full rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
           />
+        </div>
+
+        <div>
+          <label htmlFor="sourceLotId" className="block text-sm font-medium mb-2">
+            Importer le glossaire d'un lot passé (optionnel)
+          </label>
+          <select
+            id="sourceLotId"
+            name="sourceLotId"
+            className="w-full rounded-md bg-[var(--color-surface)] border border-[var(--color-border)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+          >
+            <option value="">— Aucun (démarrer avec le glossaire de base seulement)</option>
+            {pastLots.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name} — {new Date(l.createdAt).toLocaleDateString("fr-FR")}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-xs text-[var(--color-muted)]">
+            Les termes validés (extraits + manuels) du lot sélectionné seront copiés dans le
+            nouveau lot avec le statut « validé ».
+          </p>
         </div>
 
         <div>
@@ -52,11 +83,6 @@ export default function HomePage() {
           Créer le lot et extraire le glossaire
         </button>
       </form>
-
-      <section className="text-xs text-[var(--color-muted)] border-t border-[var(--color-border)] pt-4">
-        Phase 2 — Ingestion + extraction glossaire. Après upload, tu seras redirigé vers la page du
-        lot (validation glossaire à venir en Phase 3).
-      </section>
     </div>
   );
 }

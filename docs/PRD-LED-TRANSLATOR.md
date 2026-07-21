@@ -2,7 +2,7 @@
 
 **Version** : 1.0
 **Date** : 2026-07-21
-**Statut** : Validé 2026-07-21 — Phase 1 en cours
+**Statut** : Validé 2026-07-21 — V1 livrée (Phases 1→4)
 **Auteur** : Adil Bouamar + Claude Code
 
 ---

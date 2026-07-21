@@ -5,6 +5,7 @@ import { createLotFromUpload, type IncomingFile } from "@/lib/lots/create";
 
 export async function uploadLotAction(formData: FormData): Promise<void> {
   const name = String(formData.get("name") ?? "").trim() || "Lot sans nom";
+  const sourceLotId = String(formData.get("sourceLotId") ?? "").trim() || undefined;
   const rawFiles = formData.getAll("files").filter((f): f is File => f instanceof File);
 
   if (rawFiles.length === 0) {
@@ -17,6 +18,6 @@ export async function uploadLotAction(formData: FormData): Promise<void> {
     files.push({ filename: f.name, mime: f.type, buffer });
   }
 
-  const { lotId } = await createLotFromUpload({ name, files });
+  const { lotId } = await createLotFromUpload({ name, files, sourceLotId });
   redirect(`/lots/${lotId}`);
 }
