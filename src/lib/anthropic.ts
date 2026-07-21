@@ -60,3 +60,71 @@ export async function callClaude(params: {
 
   throw lastError;
 }
+
+export type VisionImage = { mediaType: "image/png" | "image/jpeg"; base64: string };
+
+/**
+ * Appel Claude vision : accepte 1..N images (base64) et un prompt utilisateur.
+ * Utilisé pour extraire du texte propre à partir de pages PDF rendues en image
+ * quand le PDF source a des polices subset sans ToUnicode CMap (extraction texte
+ * classique impossible).
+ */
+export async function callClaudeVision(params: {
+  system: string;
+  user: string;
+  images: VisionImage[];
+  maxTokens?: number;
+  temperature?: number;
+}): Promise<{ text: string; usage: UsageMeta }> {
+  let attempt = 0;
+  let lastError: unknown = null;
+
+  const content: Array<Anthropic.ImageBlockParam | Anthropic.TextBlockParam> = [
+    ...params.images.map(
+      (img): Anthropic.ImageBlockParam => ({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: img.mediaType,
+          data: img.base64,
+        },
+      }),
+    ),
+    { type: "text", text: params.user },
+  ];
+
+  while (attempt < MAX_RETRIES) {
+    try {
+      const res = await anthropic.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: params.maxTokens ?? 4096,
+        temperature: params.temperature ?? 0,
+        system: params.system,
+        messages: [{ role: "user", content }],
+      });
+
+      const text = res.content
+        .filter((block): block is Anthropic.TextBlock => block.type === "text")
+        .map((block) => block.text)
+        .join("");
+
+      return {
+        text,
+        usage: {
+          input_tokens: res.usage.input_tokens,
+          output_tokens: res.usage.output_tokens,
+        },
+      };
+    } catch (err) {
+      lastError = err;
+      const status = (err as { status?: number })?.status ?? 0;
+      const retryable = status === 429 || status >= 500;
+      if (!retryable || attempt === MAX_RETRIES - 1) break;
+      const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+      await new Promise((r) => setTimeout(r, delay));
+      attempt++;
+    }
+  }
+
+  throw lastError;
+}
