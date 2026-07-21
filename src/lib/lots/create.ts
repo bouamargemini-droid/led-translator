@@ -57,7 +57,7 @@ export async function createLotFromUpload(params: {
 
     try {
       const parsed = await parseDocument(file.buffer, ext as SupportedExt);
-      persistSegments(docId, parsed.segments.map((s) => s.text));
+      persistSegments(docId, parsed.segments);
       allSegments.push(...parsed.segments.map((s) => s.text));
 
       db.update(schema.documents)
@@ -119,13 +119,19 @@ export async function createLotFromUpload(params: {
   return { lotId, docsIngested, candidates: candidatesCount };
 }
 
-function persistSegments(documentId: string, texts: string[]): void {
+function persistSegments(
+  documentId: string,
+  segments: { index: number; text: string; kind: string; ref: string }[],
+): void {
+  if (segments.length === 0) return;
   const insert = db.insert(schema.translations).values(
-    texts.map((text, i) => ({
+    segments.map((s) => ({
       id: crypto.randomUUID(),
       documentId,
-      segmentIndex: i,
-      textFr: text,
+      segmentIndex: s.index,
+      textFr: s.text,
+      ref: s.ref,
+      kind: s.kind,
     })),
   );
   insert.run();

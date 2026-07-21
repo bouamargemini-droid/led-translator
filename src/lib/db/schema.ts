@@ -67,5 +67,7 @@ export const translations = sqliteTable("translations", {
   textZh: text("text_zh"),
   tokensIn: integer("tokens_in"),
   tokensOut: integer("tokens_out"),
+  ref: text("ref"),
+  kind: text("kind"),
   error: text("error"),
 });

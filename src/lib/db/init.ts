@@ -52,11 +52,22 @@ CREATE TABLE IF NOT EXISTS translations (
   text_zh TEXT,
   tokens_in INTEGER,
   tokens_out INTEGER,
+  ref TEXT,
+  kind TEXT,
   error TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_translations_doc ON translations(document_id);
 `;
 
+function safeAddColumn(sqlite: Database.Database, table: string, column: string, ddl: string): void {
+  const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (cols.some((c) => c.name === column)) return;
+  sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+}
+
 export function initSchema(sqlite: Database.Database): void {
   sqlite.exec(SCHEMA_SQL);
+  // Migrations legeres pour bases existantes (Phase 2 -> Phase 3)
+  safeAddColumn(sqlite, "translations", "ref", "ref TEXT");
+  safeAddColumn(sqlite, "translations", "kind", "kind TEXT");
 }
