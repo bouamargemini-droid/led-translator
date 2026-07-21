@@ -2,7 +2,7 @@
 
 **Version** : 1.0
 **Date** : 2026-07-21
-**Statut** : En attente de validation
+**Statut** : Validé 2026-07-21 — Phase 1 en cours
 **Auteur** : Adil Bouamar + Claude Code
 
 ---
@@ -43,7 +43,7 @@ Fournir un outil local qui, à partir de plusieurs documents FR (PDF texte, Word
 6. **Reconstruction in-place** :
    - `.docx` : remplacement texte dans chaque `<w:t>` en préservant runs, styles, tableaux, images, headers/footers.
    - `.xlsx` : remplacement `cell.value` en préservant formules, formats numériques, styles, images.
-   - `.pdf` : conversion du `.docx` traduit en PDF via Gotenberg (service Docker, même stack que CRM Go).
+   - `.pdf` (entrant) : extraction du texte, traduction, sortie en `.docx` traduit (Adil convertit en PDF sous Word Mac au besoin — décision D7 Option B).
 7. **Téléchargement** : bouton par document + bouton "Télécharger tout" (ZIP du lot).
 8. **Historique lots** (SQLite persistant) : liste des lots passés (nom, date, nb docs, statut), réouvrir un lot pour réutiliser son glossaire validé sur un nouveau lot.
 
